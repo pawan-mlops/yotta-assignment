@@ -1,0 +1,45 @@
+name: Yotta CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  TARGET_NAMESPACE: user1   # we can change for other tenants
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build -t yotta-user-app:${{ github.sha }} .
+          docker tag yotta-user-app:${{ github.sha }} yotta-user-app:latest
+
+      - name: Load image into kind cluster
+        run: |
+          kind load docker-image yotta-user-app:latest --name yotta-cluster
+
+      - name: Deploy using Helm
+        run: |
+          helm upgrade --install yotta-${{ env.TARGET_NAMESPACE }}-web ./yotta-web-platform \
+            -n ${{ env.TARGET_NAMESPACE }} \
+            --set image.tag=latest
+
+      - name: Verify rollout
+        run: |
+          kubectl rollout status deployment/yotta-web \
+            -n ${{ env.TARGET_NAMESPACE }} \
+            --timeout=60s
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Deployment failed. Rolling back..."
+          helm rollback yotta-${{ env.TARGET_NAMESPACE }}-web

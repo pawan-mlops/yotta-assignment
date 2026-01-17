@@ -1,0 +1,32 @@
+replicaCount: 1
+
+image:
+  repository: yotta-user-app
+  tag: latest
+  pullPolicy: Never
+
+service:
+  name: yotta-web
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: true
+  host: ""
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+hpa:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 5
+  cpuUtilization: 50
+
+networkPolicy:
+  enabled: true
