@@ -1,0 +1,13 @@
+{{- if .Values.resourceQuota.enabled }}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: yotta-quota
+spec:
+  hard:
+    pods: "5"
+    requests.cpu: "500m"
+    requests.memory: "512Mi"
+    limits.cpu: "2"
+    limits.memory: "2Gi"
+{{- end }}

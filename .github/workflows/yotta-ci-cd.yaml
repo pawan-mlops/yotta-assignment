@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  TARGET_NAMESPACE: user1   # we can change for other tenants
+  TARGET_NAMESPACE: user1   # Can be changed per tenant (user1/user2/user3)
 
 jobs:
   deploy:
@@ -38,8 +38,22 @@ jobs:
             -n ${{ env.TARGET_NAMESPACE }} \
             --timeout=60s
 
+      # Kafka Event Trigger
+      - name: Publish WebsiteCreated event to Kafka
+        run: |
+          echo '{
+            "eventType": "WebsiteCreated",
+            "namespace": "${{ env.TARGET_NAMESPACE }}",
+            "service": "yotta-web",
+            "status": "DEPLOYED",
+            "commit": "${{ github.sha }}"
+          }' | docker exec -i yotta-kafka-1 \
+            kafka-console-producer \
+            --bootstrap-server localhost:9092 \
+            --topic website-events
+
       - name: Rollback on failure
         if: failure()
         run: |
-          echo "Deployment failed. Rolling back..."
+          echo "Deployment failed. Rolling back Helm release..."
           helm rollback yotta-${{ env.TARGET_NAMESPACE }}-web

@@ -30,3 +30,6 @@ hpa:
 
 networkPolicy:
   enabled: true
+
+resourceQuota:
+  enabled: true
