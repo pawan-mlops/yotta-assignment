@@ -1,0 +1,84 @@
+pipeline {
+  agent any
+
+  environment {
+    NAMESPACE = "user1"
+    RELEASE   = "yotta-user1-web"
+    IMAGE     = "yotta-user-app:latest"
+    KAFKA_BROKER = "localhost:9092"
+    TOPIC = "website-events"
+  }
+
+  stages {
+
+    stage('Checkout') {
+      steps {
+        deleteDir()
+        sh '''
+          git clone https://github.com/pawan-mlops/yotta-assignment.git .
+        '''
+      }
+    }
+
+    stage('Build Docker Image') {
+      steps {
+        sh '''
+          docker build -t ${IMAGE} .
+        '''
+      }
+    }
+
+    stage('Load Image into kind') {
+      steps {
+        sh '''
+          kind load docker-image ${IMAGE} --name yotta-cluster
+        '''
+      }
+    }
+
+    stage('Deploy with Helm') {
+      steps {
+        sh '''
+          helm upgrade --install ${RELEASE} . \
+            -n ${NAMESPACE} \
+            --create-namespace
+        '''
+      }
+    }
+
+    stage('Verify Rollout') {
+      steps {
+        sh '''
+          kubectl rollout status deployment/yotta-web \
+            -n ${NAMESPACE} \
+            --timeout=120s
+        '''
+      }
+    }
+
+    stage('Publish Kafka Event') {
+      steps {
+        sh '''
+          echo "WebsiteCreated: ${RELEASE}" | \
+          docker exec -i yotta-kafka-1 \
+          kafka-console-producer \
+            --broker-list ${KAFKA_BROKER} \
+            --topic ${TOPIC}
+        '''
+      }
+    }
+  }
+
+  post {
+    failure {
+      echo "Deployment failed. Rolling back..."
+      sh '''
+        helm rollback ${RELEASE} -n ${NAMESPACE} || true
+      '''
+    }
+
+    success {
+      echo "Deployment successful"
+    }
+  }
+}
